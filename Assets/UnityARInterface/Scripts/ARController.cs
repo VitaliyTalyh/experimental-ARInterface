@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using System.Collections;
 
 #if UNITY_EDITOR
 using UnityEngine.Networking.PlayerConnection;
@@ -25,7 +26,20 @@ namespace UnityARInterface
         private bool m_PointCloud;
 
         [SerializeField]
+        private bool m_BackgroundRendering = true;
+
+        [SerializeField]
         private float m_Scale = 1f;
+
+        public virtual bool BackgroundRendering {
+            get { return m_BackgroundRendering; }
+
+            set {
+                if(m_ARInterface != null){
+                    m_ARInterface.BackgroundRendering = m_BackgroundRendering = value;
+                }
+            }
+        }
 
         public float scale
         {
@@ -62,6 +76,16 @@ namespace UnityARInterface
                     root.localPosition = m_InvRotation * (-poiInRootSpace * scale) + pointOfInterest;
                     root.localRotation = m_InvRotation;
                 }
+            }
+        }
+
+        public bool IsRunning
+        {
+            get
+            {
+                if (m_ARInterface == null)
+                    return false;
+                return m_ARInterface.IsRunning;
             }
         }
 
@@ -112,16 +136,35 @@ namespace UnityARInterface
             if (m_ARCamera == null)
                 m_ARCamera = Camera.main;
 
-            m_ARInterface.StartService(GetSettings());
-            m_ARInterface.SetupCamera(m_ARCamera);
+            StopAllCoroutines();
+            StartCoroutine(StartServiceRoutine());
 
-            Application.onBeforeRender += OnBeforeRender;
         }
+
+        IEnumerator StartServiceRoutine()
+        {
+            yield return m_ARInterface.StartService(GetSettings());
+            if (IsRunning)
+            {
+                m_ARInterface.SetupCamera(m_ARCamera);
+                m_ARInterface.BackgroundRendering = BackgroundRendering;
+                Application.onBeforeRender += OnBeforeRender;
+            }
+            else
+            {
+                enabled = false;
+            }
+        }
+
 
         void OnDisable()
         {
-            m_ARInterface.StopService();
-            Application.onBeforeRender -= OnBeforeRender;
+            StopAllCoroutines();
+            if (IsRunning)
+            {
+                m_ARInterface.StopService();
+                Application.onBeforeRender -= OnBeforeRender;
+            }
         }
 
         void Update()
